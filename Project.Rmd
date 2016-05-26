@@ -1,0 +1,99 @@
+---
+title: "Practical Machine Learning: Prediction Assignment"
+author: "Littal"
+date: "May 25th 2016"
+output: html_document
+---
+
+##Synopsis
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+The data in this project are from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal of the project is to predict the manner in which they did the exercise (the "classe" variable in the training set). 
+
+This report details the process of making the prediction, i.e., cross validation, model built, expected out of sample error, and other choices made along the way. Particularly, the chosen algorithm is Random Forest. The prediction model was successfully used to predict 20 different test cases (using the quiz as a feedback). 
+
+
+##Preparing the Data
+
+###R packages to be used
+The following R packages should be installed before using the code below: Caret, randomForest.
+```{r, echo=TRUE, results='hide'}
+library(caret)
+library(randomForest)
+```
+
+###Reading and cleaning raw data
+The raw data cleaning approach include few steps: defining missing values, excluding columns with all NA's, excluding experiment descriptive variables. These manipulations are executed both in the raw training data (19622 obs.) and raw test data (20 obs.). As a result, the number of columns in the training data is decreased from 160 to 53.
+```{r, echo=TRUE, results='hide'}
+setwd("~/2 Data Science Courses/8 Practical Machine Learning")
+FileURL_training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+FileURL_testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(FileURL_training, destfile = "pml-training.csv", mode = "wb")
+download.file(FileURL_testing, destfile = "pml-testing.csv", mode = "wb")
+
+#raw data
+data_training <- read.csv("pml-training.csv",header = TRUE, sep = ",")
+data_testing <- read.csv("pml-testing.csv",header = TRUE, sep = ",")
+str(data_training) ; str(data_testing)
+summary(data_training) ; summary(data_testing)
+class(data_training$classe) ; class(data_testing$classe)
+
+#raw data + defining missing values
+data_training <- read.csv("pml-training.csv",header = TRUE, sep = ",", na.strings=c("NA","#DIV/0!", ""))
+data_testing <- read.csv("pml-testing.csv",header = TRUE, sep = ",", na.strings=c("NA","#DIV/0!", ""))
+str(data_training) ; str(data_testing)
+summary(data_training) ; summary(data_testing)
+
+#raw data with missing values defined + excluding colomns with all NA's
+data_training <- data_training[,colSums(is.na(data_training)) == 0]
+data_testing <- data_testing[,colSums(is.na(data_testing)) == 0]
+str(data_training) ; str(data_testing)
+
+#raw data with no empty colomns + excluding 7 experiment descriptive variables (X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)  
+data_training <- data_training[,-c(1:7)]
+data_testing <- data_testing[,-c(1:7)]
+str(data_training) ; str(data_testing)
+```
+
+
+##Prediction Model
+
+###Cross validation
+The training data include 19622 obs. which allows to divide it into training subset and testing subset for cross-validation. The cross-validation method for a valid model: 70% of the training data is used for model building and the remaining 30% of the training data is used for model testing. For reproducibility, a seed number is set.
+```{r, echo=TRUE, results='hide'}
+set.seed(1971)
+sub_data_training <- createDataPartition(y=data_training$classe, p=0.7, list=FALSE)
+sub_training <- data_training[sub_data_training, ] 
+sub_testing <- data_training[-sub_data_training, ]
+dim(sub_training) ; dim (sub_testing)
+```
+
+###Prediction model: Random forest 
+The first choice algorithm for prediction is Random Forest. The advantage of this algorithm is its accuracy. The algorithm detects the important features for classification, therefore, there is no real need to select feature while preparing the data. 
+```{r, echo=TRUE}
+RFmodel <- randomForest(classe ~. , data=sub_training)
+RFpredict <- predict(RFmodel, sub_testing)
+confusionMatrix(RFpredict, sub_testing$classe)
+```
+
+###Expected out of sample error
+The expected out of sample error is "1-Accuracy" in the cross validation testing data (Accuracy is the proportion of correctly classified observation over the total sample in "sub_testing" data). 
+As expected, Random Forest algorithm performed very well: The Accuracy of the Random Forest model was 0.9941 (95% CI: (0.9917, 0.9959). The expected out of sample error, calculated as "1-Accuracy" for predictions using the cross-validation subset, is estimated at 0.006 (0.6%). With such accuracy, above 99% in the cross-validation subset of data, it is expected none or only few misclassification in the 20 test cases. Hence, this model is sufficient for the goal of this assignment. (Using the quiz results as a feedback, the prediction model was successful in predicting the 20 test cases).
+
+
+##Appendix
+
+###References
+The data for this project come from http://groupware.les.inf.puc-rio.br/har. These group of people generously allowed their data to be used for this assignment. The paper that refers to the dataset is: 
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+The training data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###Prediction for quiz
+```{r, echo=TRUE, results='hide'}
+Quizpredict <- predict(RFmodel, data_testing)
+Quizpredict
+```
+
+
